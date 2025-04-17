@@ -1,7 +1,3 @@
-# ======================================================
-# OTel Collector IAM Role and Policies
-# ======================================================
-
 # IAM Role for OTel Collector (EKS Service Account)
 resource "aws_iam_role" "otel_collector_role" {
   name = local.otel_collector_role_name
@@ -72,17 +68,21 @@ resource "aws_iam_role_policy_attachment" "otel_xray" {
 # ======================================================
 
 # Kubernetes Service Account for OTel Collector
+resource "aws_eks_pod_identity_association" "otel_collector_sa_attach" {
+  cluster_name    = module.eks.cluster_name
+  namespace       = local.otel_namespace
+  service_account = local.otel_serviceaccount
+  role_arn        = aws_iam_role.otel_collector_role.arn
+}
+
+# Service Account (without legacy annotation)
 resource "kubernetes_service_account" "otel_collector" {
   metadata {
     name      = local.otel_serviceaccount
     namespace = local.otel_namespace
-    annotations = {
-      "eks.amazonaws.com/role-arn" = aws_iam_role.otel_collector_role.arn
-    }
   }
 }
 
-# OTel Collector Deployment
 resource "kubernetes_deployment" "otel_collector" {
   metadata {
     name      = "otel-collector"
@@ -113,7 +113,7 @@ resource "kubernetes_deployment" "otel_collector" {
           image = "public.ecr.aws/aws-observability/aws-otel-collector:latest"
 
           port {
-            container_port = 4317  # OTLP gRPC port
+            container_port = 4317
           }
 
           env {
@@ -126,7 +126,7 @@ resource "kubernetes_deployment" "otel_collector" {
   }
 }
 
-# OTel Collector Service (LoadBalancer)
+# Service 
 resource "kubernetes_service" "otel_collector" {
   metadata {
     name      = "otel-collector"
@@ -144,13 +144,9 @@ resource "kubernetes_service" "otel_collector" {
       target_port = 4317
     }
 
-    type = "LoadBalancer"  # Use "ClusterIP" for internal access
+    type = "LoadBalancer"
   }
 }
-
-# ======================================================
-# Lambda IAM Role (For Instrumentation)
-# ======================================================
 
 # IAM Role for Lambda Function
 resource "aws_iam_role" "lambda_otel_role" {
