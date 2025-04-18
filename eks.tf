@@ -24,3 +24,11 @@
   cidr_blocks       = local.allowed_cidrs
   description       = "Allow OTel Collector traffic"
 }
+
+
+resource "aws_eks_pod_identity_association" "otel_collector_sa_attach" {
+  cluster_name    = module.eks.cluster_name
+  namespace       = local.otel_namespace
+  service_account = local.otel_serviceaccount
+  role_arn        = aws_iam_role.otel_collector_role.arn
+}
